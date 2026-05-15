@@ -565,4 +565,22 @@ describe('truncateOldToolResults', () => {
 		expect(truncateOldToolResults([])).toEqual([]);
 		expect(truncateOldToolResults(undefined as any)).toEqual([]);
 	});
+
+	test('preserves functionResponse.name when truncating (shape regression)', () => {
+		// When truncation replaced the response payload, an earlier any-typed
+		// version could have accidentally dropped the sibling `name` field.
+		// This test verifies the discriminated-union shape stays intact.
+		const history = [fnResponseTurn('important_tool', big()), fnResponseTurn('another_tool', big())];
+		const out = truncateOldToolResults(history, { keepRecent: 1 });
+		const truncatedPart = out[0].parts![0];
+
+		// The truncation marker must preserve the original functionResponse.name
+		expect(truncatedPart.functionResponse!.name).toBe('important_tool');
+		// And the response must have the truncation shape
+		const response = truncatedPart.functionResponse!.response as Record<string, unknown>;
+		expect(response).toHaveProperty('truncated', true);
+		expect(response).toHaveProperty('truncatedFrom');
+		expect(response).toHaveProperty('note');
+		expect(typeof response.note).toBe('string');
+	});
 });
